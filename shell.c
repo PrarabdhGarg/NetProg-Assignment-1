@@ -5,8 +5,22 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include<unistd.h>
+#include<signal.h>
+#include<sys/wait.h>
 
 #define MAX_ARGS 50
+
+int searchInDirectory(char *directory, char *filename) {
+    DIR *dir = opendir(directory);
+    struct dirent* file;
+    while((file = readdir(dir)) != NULL) {
+        if(strcmp(file -> d_name, filename) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
 
 char *searchInPathVariable(char *filename) {
     char *path = getenv("PATH");
@@ -20,17 +34,6 @@ char *searchInPathVariable(char *filename) {
         tok = strtok(NULL, ":");
     }
     return NULL;
-}
-
-int searchInDirectory(char *directory, char *filename) {
-    DIR *dir = opendir(directory);
-    struct dirent* file;
-    while((file = readdir(dir)) != NULL) {
-        if(strcmp(file -> d_name, filename) == 0) {
-            return 1;
-        }
-    }
-    return 0;
 }
 
 void sh_execute(char *input) {
@@ -86,8 +89,82 @@ void sh_execute(char *input) {
     }
 }
 
-void main() {
-    char *input = (char *) malloc(sizeof(char) * 500);
-    fgets(input, 500, stdin);
-    sh_execute(input);
+void printhead()
+{
+    char hostname[1024] , cdir[1024];
+    int hname = gethostname(hostname , 1024);
+    getcwd(cdir , 1024);
+
+    fprintf(stdout , "\033[1;32m%s@%s:\033[1;34m%s\033[0m$ " , getlogin() , hostname , cdir);
+    fflush(NULL);
+
+    return;
 }
+
+void suspend_handler(){
+    exit(0);
+}
+
+void main() {
+    int shell_pgid = getpid ();
+    setpgid(shell_pgid, shell_pgid);
+
+    tcsetpgrp(STDIN_FILENO , shell_pgid);
+
+    sigset_t block;
+	sigemptyset(&block);
+	sigaddset(&block, SIGINT);
+    sigaddset(&block, SIGTTOU);
+	sigaddset(&block, SIGTSTP);
+	sigaddset(&block, SIGKILL);
+    sigaddset(&block, SIGQUIT);
+
+    sigprocmask(SIG_BLOCK , &block , NULL);
+
+    char input[1000];
+
+    while(1)
+    {
+        printhead();
+
+        fgets(input , 1000 , stdin);
+        int size = strlen(input);
+        
+        input[--size] = '\0';
+        if(size == 0)
+            continue;
+
+        pid_t pid = fork();
+
+        int isbackground = 0;
+        if(input[size-1] == '&'){
+            isbackground = 1;
+            input[--size] = '\0';
+        }
+
+        if(pid == 0){
+            pid = getpid();
+            setpgid(pid, pid);
+            if(isbackground == 0){
+                tcsetpgrp(STDIN_FILENO , pid);
+            }
+            else{
+                signal(SIGTTOU , SIG_IGN);
+            }
+
+            sigprocmask(SIG_UNBLOCK , &block , NULL);
+            signal(SIGTSTP , suspend_handler);
+
+            sh_execute(input); 
+            exit(0);       
+        }
+        else{      
+            int status;
+            if(isbackground == 0){
+                waitpid(pid , &status , 0);
+            }
+            tcsetpgrp (STDIN_FILENO , shell_pgid);
+        }
+    }
+}
+
