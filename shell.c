@@ -129,7 +129,7 @@ void main() {
 
         fgets(input , 1000 , stdin);
         int size = strlen(input);
-
+        
         input[--size] = '\0';
         if(size == 0)
             continue;
@@ -146,13 +146,10 @@ void main() {
             pid = getpid();
             setpgid(pid, pid);
             if(isbackground == 0){
+                tcsetpgrp(STDIN_FILENO , pid);
                 sigprocmask(SIG_UNBLOCK , &block , NULL);
                 signal(SIGTSTP , suspend_handler);
-                tcsetpgrp(STDIN_FILENO , pid);
-            }
-            else{
-                signal(SIGTTOU , SIG_IGN);
-            }
+            }        
 
             sh_execute(input); 
             exit(0);       
