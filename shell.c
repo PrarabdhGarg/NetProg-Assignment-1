@@ -48,6 +48,10 @@ void sh_execute(char *input) {
         if(arg[0] == '<') {
             char *filename = strlen(arg) == 1 ? strtok(NULL, delim) : arg + 1;
             int fd = open(filename, O_RDONLY);
+            if(fd < 0) {
+                printf("Error. File doesn't exist\n");
+                return;
+            }
             if(dup2(fd, 0) < 0) {
                 printf("Error in duplicating file descriptor\n");
                 perror("dup2");
@@ -56,7 +60,12 @@ void sh_execute(char *input) {
         } else if(arg[0] == '>') {
             if(strlen(arg) > 1 && arg[1] == '>') {
                 char *filename = strlen(arg) == 2 ? strtok(NULL, delim) : arg + 2;
-                int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC);
+                int fd = open(filename, O_RDWR | O_TRUNC);
+                if(fd < 0) {
+                    fd = creat(filename, 0777);
+                    int fd = open(filename, O_RDWR | O_TRUNC);
+                }
+
                 if(dup2(fd, 2) < 0) {
                     printf("Error in duplicating file descriptor\n");
                     perror("dup2");
@@ -64,7 +73,11 @@ void sh_execute(char *input) {
                 }
             } else {
                 char *filename = strlen(arg) == 1 ? strtok(NULL, delim) : arg + 1;
-                int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC);
+                int fd = open(filename, O_RDWR | O_TRUNC);
+                if(fd < 0) {
+                    fd = creat(filename, 0777);
+                    int fd = open(filename, O_RDWR | O_TRUNC);
+                }
                 if(dup2(fd, 1) < 0) {
                     printf("Error in duplicating file descriptor\n");
                     perror("dup2");
