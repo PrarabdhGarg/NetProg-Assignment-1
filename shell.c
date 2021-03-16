@@ -52,25 +52,30 @@ void sh_execute(char *input) {
                 printf("Error. File doesn't exist\n");
                 return;
             }
+            printf("fd of file to read = %d\n", fd);
             if(dup2(fd, 0) < 0) {
                 printf("Error in duplicating file descriptor\n");
                 perror("dup2");
                 return;
-            }  
+            }
+            printf("Closed fd for stdin\n");
+            printf("Duplicated fd %d to fd 0", fd);  
         } else if(arg[0] == '>') {
             if(strlen(arg) > 1 && arg[1] == '>') {
                 char *filename = strlen(arg) == 2 ? strtok(NULL, delim) : arg + 2;
-                int fd = open(filename, O_RDWR | O_TRUNC);
+                int fd = open(filename, O_RDWR | O_APPEND);
                 if(fd < 0) {
                     fd = creat(filename, 0777);
-                    int fd = open(filename, O_RDWR | O_TRUNC);
+                    int fd = open(filename, O_RDWR | O_APPEND);
                 }
-
-                if(dup2(fd, 2) < 0) {
+                printf("fd of file to append = %d\n", fd);
+                if(dup2(fd, 1) < 0) {
                     printf("Error in duplicating file descriptor\n");
                     perror("dup2");
                     return;
                 }
+                printf("Closed fd for stdout\n");
+                printf("Duplicated fd %d to fd 1", fd);
             } else {
                 char *filename = strlen(arg) == 1 ? strtok(NULL, delim) : arg + 1;
                 int fd = open(filename, O_RDWR | O_TRUNC);
@@ -78,11 +83,14 @@ void sh_execute(char *input) {
                     fd = creat(filename, 0777);
                     int fd = open(filename, O_RDWR | O_TRUNC);
                 }
+                printf("fd of file to write = %d\n", fd);
                 if(dup2(fd, 1) < 0) {
                     printf("Error in duplicating file descriptor\n");
                     perror("dup2");
                     return;
                 }
+                printf("Closed fd for stdout\n");
+                printf("Duplicated fd %d to fd 1", fd);
             }
         } else if(arg[0] == '|'){
             int pfd[2];
