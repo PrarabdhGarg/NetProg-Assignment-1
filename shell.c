@@ -10,6 +10,15 @@
 #include<sys/wait.h>
 
 #define MAX_ARGS 50
+#define MAX_SHORTCUT_COMMANDS 50
+
+typedef struct {
+    int index;
+    char command[500];
+} ShortcutCommand;
+
+ShortcutCommand *scCommands;
+int scCommandsLength = 0;
 
 int searchInDirectory(char *directory, char *filename) {
     DIR *dir = opendir(directory);
@@ -34,6 +43,30 @@ char *searchInPathVariable(char *filename) {
         tok = strtok(NULL, ":");
     }
     return NULL;
+}
+
+void readScCommands() {
+    scCommands = (ShortcutCommand *) malloc(sizeof(ShortcutCommand) * MAX_SHORTCUT_COMMANDS);
+    FILE *fp = fopen(".sc_config.txt", "r");
+    if(fp == NULL) {
+        return;
+    }
+    char *input = (char *) malloc(sizeof(char) * 1000);
+    while(fgets(input, 1000, fp) != NULL) {
+        int len = strlen(input);
+        input[len - 1] == '\n' ? input[len - 1] = '\0' : 1;
+        scCommands[scCommandsLength].index = atoi(strtok(input, " "));
+        strcpy(scCommands[scCommandsLength].command, strtok(NULL, "\0"));
+        scCommandsLength++;
+    }
+}
+
+int findScCommand(int index) {
+    for(int i = 0; i < scCommandsLength; i++) {
+        if(scCommands[i].index == index)
+            return i;
+    }
+    return -1;
 }
 
 void sh_execute(char *input) {
@@ -102,6 +135,7 @@ void sh_execute(char *input) {
         printf("Invalid Command\n");
         return;
     }
+    printf("Command Path = %s", commandPath);
     if(fork() == 0) {
         execv(commandPath, args);
         printf("Call to execv system call failed\n");
@@ -126,14 +160,32 @@ void suspend_handler(){
     exit(0);
 }
 
+void inturruptHandler(int signo) {
+    printf("Shortcut Mode\n");
+    int inputIndex, arrIndex;
+    char ip[20];
+    fgets(ip, 20, stdin);
+    int len = strlen(ip);
+    ip[len - 1] = '\0';
+    inputIndex = atoi(ip);
+    if((arrIndex = findScCommand(inputIndex)) == -1) {
+        printf("Invalid Shortcut Index\n");
+        return;
+    }
+    printf("Index = %d Command = %s\n", arrIndex, scCommands[arrIndex].command);
+    sh_execute(scCommands[arrIndex].command);
+}
+
 void main() {
     int shell_pgid = getpid ();
     setpgid(shell_pgid, shell_pgid);
 
     tcsetpgrp(STDIN_FILENO , shell_pgid);
 
-    sigset_t block;
+    sigset_t block, sigint;
 	sigemptyset(&block);
+    sigemptyset(&sigint);
+    sigaddset(&sigint, SIGINT);
 	sigaddset(&block, SIGINT);
     sigaddset(&block, SIGTTOU);
 	sigaddset(&block, SIGTSTP);
@@ -144,16 +196,24 @@ void main() {
 
     char input[1000];
 
+    readScCommands();
+
     while(1)
     {
         printhead();
+        
+        sigprocmask(SIG_UNBLOCK, &sigint, NULL);
+        signal(SIGINT, inturruptHandler);
 
         fgets(input , 1000 , stdin);
+        sigprocmask(SIG_BLOCK, &sigint, NULL);
         int size = strlen(input);
         
         input[--size] = '\0';
         if(size == 0)
             continue;
+
+        printf("Input = %s\n", input);
 
         pid_t pid = fork();
 
@@ -184,4 +244,3 @@ void main() {
         }
     }
 }
-
