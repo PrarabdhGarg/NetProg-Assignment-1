@@ -8,9 +8,13 @@
 #include<unistd.h>
 #include<signal.h>
 #include<sys/wait.h>
+#include <setjmp.h>
 
 #define MAX_ARGS 50
 #define MAX_SHORTCUT_COMMANDS 50
+
+char input[1000];
+jmp_buf return_here;
 
 typedef struct {
     int index;
@@ -85,14 +89,14 @@ void sh_execute(char *input) {
                 printf("Error. File doesn't exist\n");
                 return;
             }
-            printf("fd of file to read = %d\n", fd);
+            //printf("fd of file to read = %d\n", fd);
             if(dup2(fd, 0) < 0) {
                 printf("Error in duplicating file descriptor\n");
                 perror("dup2");
                 return;
             }
-            printf("Closed fd for stdin\n");
-            printf("Duplicated fd %d to fd 0", fd);  
+            //printf("Closed fd for stdin\n");
+            //printf("Duplicated fd %d to fd 0", fd);  
         } else if(arg[0] == '>') {
             if(strlen(arg) > 1 && arg[1] == '>') {
                 char *filename = strlen(arg) == 2 ? strtok(NULL, delim) : arg + 2;
@@ -101,14 +105,14 @@ void sh_execute(char *input) {
                     fd = creat(filename, 0777);
                     int fd = open(filename, O_RDWR | O_APPEND);
                 }
-                printf("fd of file to append = %d\n", fd);
+                //printf("fd of file to append = %d\n", fd);
                 if(dup2(fd, 1) < 0) {
                     printf("Error in duplicating file descriptor\n");
                     perror("dup2");
                     return;
                 }
-                printf("Closed fd for stdout\n");
-                printf("Duplicated fd %d to fd 1", fd);
+                //printf("Closed fd for stdout\n");
+                //printf("Duplicated fd %d to fd 1", fd);
             } else {
                 char *filename = strlen(arg) == 1 ? strtok(NULL, delim) : arg + 1;
                 int fd = open(filename, O_RDWR | O_TRUNC);
@@ -116,14 +120,14 @@ void sh_execute(char *input) {
                     fd = creat(filename, 0777);
                     int fd = open(filename, O_RDWR | O_TRUNC);
                 }
-                printf("fd of file to write = %d\n", fd);
+                //printf("fd of file to write = %d\n", fd);
                 if(dup2(fd, 1) < 0) {
                     printf("Error in duplicating file descriptor\n");
                     perror("dup2");
                     return;
                 }
-                printf("Closed fd for stdout\n");
-                printf("Duplicated fd %d to fd 1", fd);
+                //printf("Closed fd for stdout\n");
+                //printf("Duplicated fd %d to fd 1", fd);
             }
         } else if(arg[0] == '|'){
             int pfd[2];
@@ -163,13 +167,8 @@ void sh_execute(char *input) {
         printf("Invalid Command : %s\n" , args[0]);
         return;
     }
-    printf("Command Path = %s", commandPath);
-    if(fork() == 0) {
-        execv(commandPath, args);
-        printf("Call to execv system call failed\n");
-    } else {
-        wait(NULL);
-    }
+    execv(commandPath, args);
+    printf("Call to execv system call failed\n");
 }
 
 void printhead()
@@ -189,7 +188,7 @@ void suspend_handler(){
 }
 
 void inturruptHandler(int signo) {
-    printf("Shortcut Mode\n");
+    printf("\nShortcut Mode:");
     int inputIndex, arrIndex;
     char ip[20];
     fgets(ip, 20, stdin);
@@ -198,10 +197,12 @@ void inturruptHandler(int signo) {
     inputIndex = atoi(ip);
     if((arrIndex = findScCommand(inputIndex)) == -1) {
         printf("Invalid Shortcut Index\n");
-        return;
+        input[0] = '\0';
+        siglongjmp(return_here, 1);
     }
-    printf("Index = %d Command = %s\n", arrIndex, scCommands[arrIndex].command);
-    sh_execute(scCommands[arrIndex].command);
+    strcpy(input , scCommands[arrIndex].command);
+
+    siglongjmp (return_here, 1);
 }
 
 void main() {
@@ -222,8 +223,6 @@ void main() {
 
     sigprocmask(SIG_BLOCK , &block , NULL);
 
-    char input[1000];
-
     readScCommands();
 
     while(1)
@@ -234,14 +233,15 @@ void main() {
         signal(SIGINT, inturruptHandler);
 
         fgets(input , 1000 , stdin);
+        sigsetjmp (return_here , 1);
+
         sigprocmask(SIG_BLOCK, &sigint, NULL);
         int size = strlen(input);
         
-        input[--size] = '\0';
+        if(input[size - 1] == '\n')
+            input[--size] = '\0';
         if(size == 0)
             continue;
-
-        printf("Input = %s\n", input);
 
         pid_t pid = fork();
 
