@@ -13,7 +13,7 @@
 #define MAX_ARGS 50
 #define MAX_SHORTCUT_COMMANDS 50
 
-char input[1000];
+char input[1000]= "";
 jmp_buf return_here;
 
 typedef struct {
@@ -67,8 +67,9 @@ void readScCommands() {
 
 int findScCommand(int index) {
     for(int i = 0; i < scCommandsLength; i++) {
-        if(scCommands[i].index == index)
+        if(scCommands[i].index == index){
             return i;
+        }
     }
     return -1;
 }
@@ -232,8 +233,8 @@ void main() {
         sigprocmask(SIG_UNBLOCK, &sigint, NULL);
         signal(SIGINT, inturruptHandler);
 
-        fgets(input , 1000 , stdin);
-        sigsetjmp (return_here , 1);
+        if(sigsetjmp (return_here , 1) == 0)
+            fgets(input , 1000 , stdin);
 
         sigprocmask(SIG_BLOCK, &sigint, NULL);
         int size = strlen(input);
