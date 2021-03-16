@@ -84,22 +84,48 @@ void sh_execute(char *input) {
                     return;
                 }
             }
-        } else {
+        } else if(arg[0] == '|'){
+            int pfd[2];
+            pipe(pfd);
+
+            pid_t pid = fork();
+
+            if(pid == 0){
+                close(pfd[0]);
+                dup2(pfd[1] , 1);
+
+                args[i] = NULL;
+                if((commandPath = searchInPathVariable(args[0])) == NULL) {
+                    printf("Invalid Command\n");
+                    return;
+                }
+                execv(commandPath, args);
+                printf("Call to execv system call failed\n");
+
+            }
+            else{
+                close(pfd[1]);
+                dup2(pfd[0] , 0);
+
+                int status;
+                wait(&status);
+
+                i = 0;
+            }
+        }else {
             args[i++] = arg;
         }
         arg = strtok(NULL, delim);
     }
     args[i] = NULL;
-    if((commandPath = searchInPathVariable(command)) == NULL) {
-        printf("Invalid Command\n");
+    if((commandPath = searchInPathVariable(args[0])) == NULL) {
+        printf("Invalid Command : %s\n" , args[0]);
         return;
     }
-    if(fork() == 0) {
-        execv(commandPath, args);
-        printf("Call to execv system call failed\n");
-    } else {
-        wait(NULL);
-    }
+
+    execv(commandPath, args);
+    printf("Call to execv system call failed\n");
+
 }
 
 void printhead()
@@ -108,7 +134,7 @@ void printhead()
     int hname = gethostname(hostname , 1024);
     getcwd(cdir , 1024);
 
-    fprintf(stdout , "\033[1;32m%s@%s:\033[1;34m%s\033[0m$ " , getlogin() , hostname , cdir);
+    fprintf(stdout , "\033[1;33m%s@%s:\033[1;34m%s\033[0m$ " , getlogin() , hostname , cdir);
     fflush(NULL);
 
     return;
