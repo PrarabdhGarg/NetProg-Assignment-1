@@ -16,6 +16,12 @@
 char input[1000]= "";
 jmp_buf return_here;
 
+typedef struct node{
+    int avail;
+    int pfds[3];
+    struct node* next;
+}PIPE;
+
 typedef struct {
     int index;
     char command[500];
@@ -108,6 +114,7 @@ int findScCommand(int index) {
 }
 
 void sh_execute(char *input) {
+    PIPE* list = NULL;
     char *args[50];
     char *delim = " \t\n";
     char *command = strtok(input, delim);
@@ -179,7 +186,7 @@ void sh_execute(char *input) {
                     return;
                 }
             }
-        } else if(arg[0] == '|'){
+        } else if(strcmp(arg , "|") == 0){
             int pfd[2];
             pipe(pfd);
 
@@ -207,6 +214,110 @@ void sh_execute(char *input) {
 
                 i = 0;
             }
+        }else if(strcmp(arg , "||") == 0 || strcmp(arg , "|||") == 0){
+            PIPE* temp = malloc(sizeof(PIPE));
+            temp->next = NULL;
+            if(list == NULL)
+                list = temp;
+            else{
+                temp->next = list;
+                list = temp;
+            }
+
+            if(strcmp(arg , "||") == 0)
+                temp->avail = 2;
+            else
+                temp->avail = 3;
+            int pfds[temp->avail][2];
+            for(int j=0; j<temp->avail; j++){
+                pipe(pfds[j]);
+                temp->pfds[j] = pfds[j][0];
+            }
+
+            pid_t pid = fork();
+            if(pid == 0){
+                int pfd[2];
+
+                for(int j=0; j<temp->avail; j++){
+                    close(pfds[j][0]);
+                }
+
+                pipe(pfd);
+
+                if(fork() == 0){
+                    close(pfd[0]);
+                    dup2(pfd[1] , 1);
+
+                    args[i] = NULL;
+                    if((commandPath = searchInPathVariable(args[0])) == NULL) {
+                        printf("Invalid Command\n");
+                        return;
+                    }
+                    execv(commandPath, args);
+                    printf("Call to execv system call failed\n");
+                }else{
+                    close(pfd[1]);
+
+                    int status;
+                    wait(&status);
+
+                    i = 0;
+                    char buf;
+                    while(read(pfd[0], &buf, 1) > 0){
+                        for(int j=0; j<temp->avail; j++){
+                            write(pfds[j][1], &buf, 1);
+                        }
+                    }
+                    exit(0);
+                }
+            }else{
+                for(int j=0; j<temp->avail; j++){
+                    close(pfds[j][1]);
+                }
+
+                temp->avail--;
+                dup2(temp->pfds[temp->avail] , 0);
+
+                int status;
+                wait(&status);
+
+                i = 0;
+            }
+
+        }else if(arg[0] == ','){
+            if(list == NULL){
+                printf("Invalid Syntax\n");
+                return;
+            }
+
+            pid_t pid = fork();
+
+            if(pid == 0){
+                args[i] = NULL;
+                if((commandPath = searchInPathVariable(args[0])) == NULL) {
+                    printf("Invalid Command\n");
+                    return;
+                }
+                execv(commandPath, args);
+                printf("Call to execv system call failed\n");
+
+            }
+            else{
+                int status;
+                wait(&status);
+
+                list->avail--;
+                dup2(list->pfds[list->avail] , 0);
+
+                if(list->avail == 0){
+                    PIPE* temp = list;
+                    list = list->next;
+                    free(temp);
+                }
+
+                i = 0;
+            }
+            
         }else {
             args[i++] = arg;
         }
