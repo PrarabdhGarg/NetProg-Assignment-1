@@ -1,0 +1,3 @@
+a.out
+shell.c
+temp.txt
