@@ -62,6 +62,7 @@ void readScCommands() {
         return;
     }
     char *input = (char *) malloc(sizeof(char) * 1000);
+    scCommandsLength = 0;
     while(fgets(input, 1000, fp) != NULL) {
         int len = strlen(input);
         input[len - 1] == '\n' ? input[len - 1] = '\0' : 1;
@@ -69,9 +70,41 @@ void readScCommands() {
         strcpy(scCommands[scCommandsLength].command, strtok(NULL, "\0"));
         scCommandsLength++;
     }
+    fclose(fp);
+}
+
+int writeScCommand(int index, char *command) {
+    FILE *fp = fopen(".sc_config.txt", "a");
+    if(fp == NULL)
+        return -2;
+    scCommands[scCommandsLength].index = index;
+    strcpy(scCommands[scCommandsLength].command, command);
+    scCommandsLength++;
+    fprintf(fp, "%d %s\n", index, command);
+    fflush(fp);
+    fclose(fp);
+    return 0;
+}
+
+int removeScCommand(int index) {
+    FILE *fp = fopen(".sc_config.txt", "w");
+    int ret = -1;
+    if(fp == NULL)
+        return -1;
+    for(int i = 0; i < scCommandsLength; i++) {
+        if(index != scCommands[i].index) {
+            fprintf(fp, "%d %s\n", scCommands[i].index, scCommands[i].command);  
+            ret++;
+        }     
+    }
+    fclose(fp);
+    if(ret == 0)
+        readScCommands();
+    return ret;
 }
 
 int findScCommand(int index) {
+    printf("Commands = %d\n", scCommandsLength);
     for(int i = 0; i < scCommandsLength; i++) {
         if(scCommands[i].index == index){
             return i;
@@ -91,6 +124,31 @@ void sh_execute(char *input) {
     char *args[50];
     char *delim = " \t\n";
     char *command = strtok(input, delim);
+    if(strcmp(command, "sc") == 0) {
+        char *arg = strtok(NULL, delim);
+        if(strcmp(arg, "-d") == 0) {
+            int index = atoi(strtok(NULL, delim));
+            if(removeScCommand(index) == -1) {
+                printf("Error removing shortcut command\n");
+                return;
+            }
+            printf("Shortcut command removed sucessfully\n");
+            return;
+        } else if(strcmp(arg, "-i") == 0) {
+            char *temp = strtok(NULL, delim);
+            int index = atoi(temp);
+            char *comm = strtok(NULL, "\0");
+            if(writeScCommand(index, comm) == -1) {
+                printf("Error while adding Shortcut command\n");
+                return;
+            }
+            printf("Shortcut command added sucessfully\n");
+            return;
+        } else {
+            printf("Invlaid Argument\n");
+            return;
+        }
+    }
     char *commandPath;
     args[0] = command;
     int i = 1;
@@ -356,12 +414,10 @@ void main() {
 
     sigprocmask(SIG_BLOCK , &block , NULL);
 
-    readScCommands();
-
     while(1)
     {
         printhead();
-        
+        readScCommands();
         sigprocmask(SIG_UNBLOCK, &sigint, NULL);
         signal(SIGINT, inturruptHandler);
 
@@ -375,7 +431,6 @@ void main() {
             input[--size] = '\0';
         if(size == 0)
             continue;
-
         pid_t pid = fork();
 
         int isbackground = 0;
