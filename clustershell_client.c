@@ -41,7 +41,7 @@ char *getIP(char *name) {
     return NULL;
 }
 
-char *sendCommandToServer(char *ip, int port, char *command) {
+char *sendCommandToServer(char *ip, int port, char *command, char *input) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if(sock < 0) {
         perror("socket()");
@@ -57,7 +57,11 @@ char *sendCommandToServer(char *ip, int port, char *command) {
         perror("connect()");
     }
 
-    if(send(sock, command, strlen(command), 0) < 0) {
+    char *buff = (char *)malloc(sizeof(int) + strlen(command) + strlen(input));
+    *buff = strlen(command);
+    strcpy(buff + sizeof(int), command);
+    strcpy(buff + sizeof(int) + strlen(command), input); 
+    if(send(sock, buff, sizeof(int) + strlen(command) + strlen(input), 0) < 0) {
         perror("send()");
     }
 
@@ -72,18 +76,18 @@ char *sendCommandToServer(char *ip, int port, char *command) {
     return buff;
 }
 
-char *execCommand(char *command) {
+char *execCommand(char *command, char *input) {
     char *tempCommand = (char *) malloc(sizeof(char) * (strlen(command) + 1));
     strcpy(tempCommand, command);
     char *temp;
     char *first = strtok_r(tempCommand, " \t\n\0", &temp);
     if(strchr(first, '.') == NULL) {
         // Send command to local-host
-        return sendCommandToServer(LOCAL_ADDRESS, SERVER_PORT, command);
+        return sendCommandToServer(LOCAL_ADDRESS, SERVER_PORT, command, input);
     } else {
         // Extract name
         char *name = strtok_r(first, '.', &temp);
-        return sendCommandToServer(getIP(name), SERVER_PORT, command);
+        return sendCommandToServer(getIP(name), SERVER_PORT, command, input);
     }
 }
 
@@ -107,11 +111,7 @@ void main(int argc, char *argv[]) {
         int commands = 0;
         while(command != NULL) {
             command = strtok(NULL, "|");
-            prevOut = execCommand(command);
-            if(command != NULL) {
-                // O/P redirection necessary
-                strcat(command, prevOut);
-            }
+            prevOut = execCommand(command, prevOut);
             commands++;
         }
     }
