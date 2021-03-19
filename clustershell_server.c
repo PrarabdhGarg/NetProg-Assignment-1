@@ -81,6 +81,7 @@ int main(){
         int ipfd[2] , opfd[2];
         pipe(ipfd);
         pipe(opfd);
+        
         if(fork() == 0){
             close(opfd[0]);
             dup2(opfd[1] , 1);
@@ -99,9 +100,23 @@ int main(){
             }
 
             execvp(args[0] , args);
+            printf("Exec call failed");
+            exit(0);
         }else{
             close(opfd[1]);
             close(ipfd[0]);
+
+            char buf;
+            while(recv(connfd , &buf , 1 , 0) > 0){
+                write(ipfd[1] , &buf , 1);
+            }
+            close(ipfd[1]);
+
+            while(read(opfd[0] , &buf , 1) > 0){
+                send(connfd , &buf , 1 , 0);
+            }
+            close(connfd);
+            close(opfd[0]);
         }
     }
 }

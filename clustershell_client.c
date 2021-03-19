@@ -58,7 +58,7 @@ char *sendCommandToServer(char *ip, int port, char *command, char *input) {
     }
 
     char *buff = (char *)malloc(sizeof(int) + strlen(command) + strlen(input));
-    *buff = strlen(command);
+    snprintf(buff , sizeof(int) , "%d" , strlen(command));
     strcpy(buff + sizeof(int), command);
     strcpy(buff + sizeof(int) + strlen(command), input); 
     if(send(sock, buff, sizeof(int) + strlen(command) + strlen(input), 0) < 0) {
@@ -114,5 +114,6 @@ void main(int argc, char *argv[]) {
             prevOut = execCommand(command, prevOut);
             commands++;
         }
+        printf("%s" , prevOut);
     }
 }
