@@ -114,6 +114,12 @@ int findScCommand(int index) {
 }
 
 void sh_execute(char *input) {
+    int saved_ip = dup(0);
+    int saved_op = dup(1);
+
+    FILE* ip_stream = fdopen(saved_ip , "r");
+    FILE* op_stream = fdopen(saved_op , "w");
+
     PIPE* list = NULL;
     char *args[50];
     char *delim = " \t\n";
@@ -155,6 +161,7 @@ void sh_execute(char *input) {
                 printf("Error. File doesn't exist\n");
                 return;
             }
+            fprintf(op_stream , "Input Redirection Original Fd = %d, Remapped Fd = 0\n", fd);
             if(dup2(fd, 0) < 0) {
                 printf("Error in duplicating file descriptor\n");
                 perror("dup2");
@@ -168,6 +175,7 @@ void sh_execute(char *input) {
                     fd = creat(filename, 0777);
                     int fd = open(filename, O_RDWR | O_APPEND);
                 }
+                fprintf(op_stream , "Output Redirection Fd = %d, Remapped Fd = 1\n", fd);
                 if(dup2(fd, 1) < 0) {
                     printf("Error in duplicating file descriptor\n");
                     perror("dup2");
@@ -180,6 +188,7 @@ void sh_execute(char *input) {
                     fd = creat(filename, 0777);
                     int fd = open(filename, O_RDWR | O_TRUNC);
                 }
+                fprintf(op_stream , "Output Redirection Fd = %d, Remapped Fd = 1\n", fd);
                 if(dup2(fd, 1) < 0) {
                     printf("Error in duplicating file descriptor\n");
                     perror("dup2");
@@ -190,6 +199,8 @@ void sh_execute(char *input) {
             int pfd[2];
             pipe(pfd);
 
+            fprintf(op_stream , "Pipe Input Fd = %d, Pipe Output Fd = %d\n" , pfd[0] , pfd[1]);
+
             pid_t pid = fork();
 
             if(pid == 0){
@@ -197,6 +208,7 @@ void sh_execute(char *input) {
                 dup2(pfd[1] , 1);
 
                 args[i] = NULL;
+                fprintf(op_stream , "Pipe Step: %s, Process Id: %d\n", args[0] , getpid());
                 if((commandPath = searchInPathVariable(args[0])) == NULL) {
                     printf("Invalid Command\n");
                     return;
@@ -238,15 +250,22 @@ void sh_execute(char *input) {
             if(pid == 0){
                 int pfd[2];
 
+                fprintf(op_stream , "Pipe Input Fd: %d , Pipe Output Fd: " , pfd[1]);
+
                 for(int j=0; j<temp->avail; j++){
+                    fprintf(op_stream , "%d,", pfds[j][0]);
                     close(pfds[j][0]);
                 }
+
+                fprintf(op_stream , "\n");
 
                 pipe(pfd);
 
                 if(fork() == 0){
                     close(pfd[0]);
                     dup2(pfd[1] , 1);
+
+                    fprintf(op_stream , "Pipe Step: %s, Process Id: %d\n", args[0] , getpid());
 
                     args[i] = NULL;
                     if((commandPath = searchInPathVariable(args[0])) == NULL) {
@@ -284,7 +303,13 @@ void sh_execute(char *input) {
                 i = 0;
             }
 
-        }else if(arg[0] == ','){
+        }else if(arg[strlen(arg)- 1] == ','){
+            
+            if(strlen(arg) > 1){
+                arg[strlen(arg)- 1] = '\0';
+                args[i++] = arg;
+            }
+
             if(list == NULL){
                 printf("Invalid Syntax\n");
                 return;
@@ -298,6 +323,9 @@ void sh_execute(char *input) {
                     printf("Invalid Command\n");
                     return;
                 }
+
+                fprintf(op_stream , "Pipe Step: %s, Process Id: %d\n", args[0] , getpid());
+
                 execv(commandPath, args);
                 printf("Call to execv system call failed\n");
 
@@ -308,6 +336,7 @@ void sh_execute(char *input) {
 
                 list->avail--;
                 dup2(list->pfds[list->avail] , 0);
+                dup2(saved_op , 1);
 
                 if(list->avail == 0){
                     PIPE* temp = list;
@@ -324,6 +353,7 @@ void sh_execute(char *input) {
         arg = strtok(NULL, delim);
     }
     args[i] = NULL;
+    fprintf(op_stream , "Final Step: %s, Process Id: %d\n", args[0] , getpid());
     if((commandPath = searchInPathVariable(args[0])) == NULL) {
         printf("Invalid Command : %s\n" , args[0]);
         return;
@@ -425,6 +455,19 @@ void main() {
             int status;
             if(isbackground == 0){
                 waitpid(pid , &status , 0);
+                if(WIFEXITED(status)){
+                    WEXITSTATUS(status);
+                    printf("Process Id:%d Exited with Status:%d\n", pid, status);
+                }
+                else if(WIFSTOPPED(status)){
+                    WSTOPSIG(status);
+                    printf("Process Id:%d Stopped with Status:%d\n", pid, status);
+                }
+                else if(WIFSIGNALED(status)){
+                    WTERMSIG(status);
+                    printf("Process Id:%d Terminated with Status:%d\n", pid, status);
+                }
+                
             }
             tcsetpgrp (STDIN_FILENO , shell_pgid);
         }
