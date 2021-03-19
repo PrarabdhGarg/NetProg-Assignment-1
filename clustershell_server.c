@@ -42,6 +42,26 @@ char* get_cwd(char* ip){
     return states[no_of_nodes-1].cwd;
 }
 
+void change_state(char* ip , char* state){
+    for(int i=0; i<no_of_nodes; i++){
+        if(strcmp(ip , states[i].ip)==0)
+            strcpy(states[i].cwd , state);
+    }
+    strcpy(states[no_of_nodes].ip , ip);
+    strcpy(states[no_of_nodes].cwd , state);
+
+    no_of_nodes++;
+
+    if(fork() == 0){
+        for(int i=0; i<no_of_nodes; i++){
+            fprintf(config , "%s %s\n" , states[i].ip , states[i].cwd);
+        }
+        exit(0);
+    }else{
+        return;
+    }
+}
+
 int main(){
     int listenfd;
     if((listenfd = socket(PF_INET , SOCK_STREAM , 0)) < 0){
@@ -81,42 +101,52 @@ int main(){
         int ipfd[2] , opfd[2];
         pipe(ipfd);
         pipe(opfd);
-        
-        if(fork() == 0){
-            close(opfd[0]);
-            dup2(opfd[1] , 1);
 
-            close(ipfd[1]);
-            dup2(ipfd[0] , 0);
+        char *delim = " \t\n";
+        char* command = strtok(cmd , delim);
 
-            char* args[100];
-            char *delim = " \t\n";
-            char* arg = strtok(cmd , delim);
-
-            int i=0;
-            while(arg != NULL){
-                args[i++] = arg;
-                arg = strtok(NULL , delim);
-            }
-
-            execvp(args[0] , args);
-            printf("Exec call failed");
-            exit(0);
+        if(strcmp(command , "cd") == 0){
+            char* newstate = strtok(NULL , delim);
+            change_state(ip , newstate);
+            
+            chdir(newstate);
         }else{
-            close(opfd[1]);
-            close(ipfd[0]);
 
-            char buf;
-            while(recv(connfd , &buf , 1 , 0) > 0){
-                write(ipfd[1] , &buf , 1);
-            }
-            close(ipfd[1]);
+            if(fork() == 0){
+                close(opfd[0]);
+                dup2(opfd[1] , 1);
 
-            while(read(opfd[0] , &buf , 1) > 0){
-                send(connfd , &buf , 1 , 0);
+                close(ipfd[1]);
+                dup2(ipfd[0] , 0);
+
+                char* args[100];
+                char* arg = command;
+
+                int i=0;
+                while(arg != NULL){
+                    args[i++] = arg;
+                    arg = strtok(NULL , delim);
+                }
+
+                execvp(args[0] , args);
+                printf("Exec call failed");
+                exit(0);
+            }else{
+                close(opfd[1]);
+                close(ipfd[0]);
+
+                char buf;
+                while(recv(connfd , &buf , 1 , 0) > 0){
+                    write(ipfd[1] , &buf , 1);
+                }
+                close(ipfd[1]);
+
+                while(read(opfd[0] , &buf , 1) > 0){
+                    send(connfd , &buf , 1 , 0);
+                }  
+                close(opfd[0]);
             }
-            close(connfd);
-            close(opfd[0]);
         }
+        close(connfd);
     }
 }
