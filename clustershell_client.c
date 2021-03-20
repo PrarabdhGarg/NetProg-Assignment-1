@@ -56,7 +56,6 @@ char *sendCommandToServer(char *ip, int port, char *command, char *input) {
     if(connect(sock, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
         perror("connect()");
     }
-
     char *buff = (char *)malloc(sizeof(int) + strlen(command) + strlen(input));
     snprintf(buff , sizeof(int) , "%d" , strlen(command));
     strcpy(buff + sizeof(int), command);
@@ -67,13 +66,13 @@ char *sendCommandToServer(char *ip, int port, char *command, char *input) {
 
     shutdown(sock , SHUT_WR);
 
-    char *buff = (char *)malloc(sizeof(char) * 5000);
+    char *recv_buff = (char *)malloc(sizeof(char) * 5000);
     char *temp = (char *)malloc(sizeof(char) * 100);
     while(recv(sock, temp, 100, 0) != 0) {
-        strcat(buff, temp);
+        strcat(recv_buff, temp);
     }
     free(temp);
-    return buff;
+    return recv_buff;
 }
 
 char *execCommand(char *command, char *input) {
@@ -99,7 +98,7 @@ void main(int argc, char *argv[]) {
     readConfigFile(argv[1]);
     
     char input[1000];
-    char prevOut = "";
+    char *prevOut = "";
     while(1) {
         fgets(input, 1000, stdin);
         int size = strlen(input);
@@ -110,9 +109,9 @@ void main(int argc, char *argv[]) {
         char *command = strtok(input, "|");
         int commands = 0;
         while(command != NULL) {
-            command = strtok(NULL, "|");
             prevOut = execCommand(command, prevOut);
             commands++;
+            command = strtok(NULL, "|");
         }
         printf("%s" , prevOut);
     }
