@@ -86,6 +86,28 @@ char *sendCommandToServer(char *ip, int port, char *command, char *input) {
     return recv_buff;
 }
 
+char *concatenate(size_t size, char *array[size], const char *joint){
+    size_t jlen, lens[size];
+    size_t i, total_size = (size-1) * (jlen=strlen(joint)) + 1;
+    char *result, *p;
+
+
+    for(i=0;i<size;++i){
+        total_size += (lens[i]=strlen(array[i]));
+    }
+    p = result = malloc(total_size);
+    for(i=0;i<size;++i){
+        memcpy(p, array[i], lens[i]);
+        p += lens[i];
+        if(i<size-1){
+            memcpy(p, joint, jlen);
+            p += jlen;
+        }
+    }
+    *p = '\0';
+    return result;
+}
+
 char *execCommand(char *command, char *input) {
     char *tempCommand = (char *) malloc(sizeof(char) * (strlen(command) + 1));
     strcpy(tempCommand, command);
@@ -94,6 +116,19 @@ char *execCommand(char *command, char *input) {
     if(strchr(first, '.') == NULL) {
         // Send command to local-host
         return sendCommandToServer(LOCAL_ADDRESS, SERVER_PORT, command, input);
+    } else if(strchr(first, '*') != NULL) {
+        // Send Command to each server
+        char *temp[noOfAdresses];
+        char *name = strtok_r(first, ".", &temp);
+        char* delim = ".";
+        char *t = strtok(command , delim);
+        char *comm = strtok(NULL, "\0");
+        for(int i = 0; i < noOfAdresses; i++) {
+            temp[i] = sendCommandToServer(addresses[i].ipAddress, SERVER_PORT, comm, input);
+        }
+        char *final = concatenate(noOfAdresses, temp, "\n");
+        return final;
+        
     } else {
         // Extract name
         char *name = strtok_r(first, ".", &temp);
@@ -101,7 +136,7 @@ char *execCommand(char *command, char *input) {
         char* delim = ".";
         char *t = strtok(command , delim);
 
-        return sendCommandToServer(getIP(name), SERVER_PORT, strtok(NULL , delim), input);
+        return sendCommandToServer(getIP(name), SERVER_PORT, strtok(NULL , "\0"), input);
     }
 }
 
@@ -133,7 +168,7 @@ void main(int argc, char *argv[]) {
         char *command = strtok(input, "|");
         int commands = 0;
         while(command != NULL) {
-            prevOut = execCommand(command, prevOut);;
+            prevOut = execCommand(command, prevOut);
             commands++;
             command = strtok(NULL, "|");
         }
