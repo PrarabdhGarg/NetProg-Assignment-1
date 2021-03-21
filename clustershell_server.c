@@ -16,16 +16,18 @@ typedef struct state{
 
 STATE states[100];
 int no_of_nodes;
-FILE* config;
+
 
 void readConfig(){
-    config = fopen("server_config.txt" , "r");
+    FILE* config = fopen("server_config.txt" , "r");
     no_of_nodes = 0;
 
     while(!feof(config)){
         fscanf(config , "%s %s" , states[no_of_nodes].ip , states[no_of_nodes].cwd);
         no_of_nodes++;
     }
+
+    fclose(config);
 }
 
 char* get_cwd(char* ip){
@@ -38,6 +40,13 @@ char* get_cwd(char* ip){
     strcpy(states[no_of_nodes].cwd , getenv("HOME"));
 
     no_of_nodes++;
+
+    // FILE* cfg = fopen("server_config.txt" , "w");
+    // for(int i=0; i<no_of_nodes; i++){
+    //     fprintf(cfg , "%s %s\n" , states[i].ip , states[i].cwd);
+    //     fflush(cfg);
+    // }
+    // fclose(cfg);
 
     return states[no_of_nodes-1].cwd;
 }
@@ -52,14 +61,12 @@ void change_state(char* ip , char* state){
 
     no_of_nodes++;
 
-    if(fork() == 0){
-        for(int i=0; i<no_of_nodes; i++){
-            fprintf(config , "%s %s\n" , states[i].ip , states[i].cwd);
-        }
-        exit(0);
-    }else{
-        return;
-    }
+    // FILE* config = fopen("server_config.txt" , "w");
+    // for(int i=0; i<no_of_nodes; i++){
+    //     printf("H %s %s\n" , states[i].ip , states[i].cwd);
+    //     fprintf(config , "%s %s\n" , states[i].ip , states[i].cwd);
+    // }
+    //fclose(config);
 }
 
 int main(){
@@ -81,12 +88,14 @@ int main(){
 
     bind(listenfd , (struct sockaddr*) &servaddr , sizeof(servaddr));
     listen(listenfd , 5);
+    fflush(stdout);
 
     struct sockaddr_in cliaddr;
 
     for(; ;){
         int clilen = sizeof(cliaddr);
         int connfd = accept(listenfd , (struct sockaddr*) &cliaddr , &clilen);
+        fflush(stdout);
 
         char* ip = inet_ntoa(cliaddr.sin_addr);
         char* state = get_cwd(ip);
@@ -98,21 +107,30 @@ int main(){
         char cmd[cmdlen+1];
         recv(connfd , cmd , cmdlen+1 , 0);
 
+
         int ipfd[2] , opfd[2];
         pipe(ipfd);
         pipe(opfd);
 
         char *delim = " \t\n";
         char* command = strtok(cmd , delim);
-
+        printf("command %s\n" , command);
         if(strcmp(command , "cd") == 0){
+            printf("here\n");
             char* newstate = strtok(NULL , delim);
             change_state(ip , newstate);
+            printf("Here %s\n" , newstate);
             
+            char b[100];
+            getcwd(b , 100);
+            printf("H %s %s\n" , b , newstate);
             chdir(newstate);
+            getcwd(b , 100);
+            printf("H %s %s\n" , b , newstate);
         }else{
 
             if(fork() == 0){
+
                 close(opfd[0]);
                 dup2(opfd[1] , 1);
 
@@ -128,6 +146,7 @@ int main(){
                     arg = strtok(NULL , delim);
                 }
 
+                args[i] = NULL;
                 execvp(args[0] , args);
                 printf("Exec call failed");
                 exit(0);
@@ -141,9 +160,14 @@ int main(){
                 }
                 close(ipfd[1]);
 
+                char *recv_buff = (char *)malloc(sizeof(char) * 10000);
                 while(read(opfd[0] , &buf , 1) > 0){
-                    send(connfd , &buf , 1 , 0);
-                }  
+                    strncat(recv_buff, &buf, 1);
+                }
+
+                int oplen = strlen(recv_buff);
+                send(connfd , &oplen , sizeof(int) , 0);
+                send(connfd , recv_buff , oplen+1 , 0);
                 close(opfd[0]);
             }
         }

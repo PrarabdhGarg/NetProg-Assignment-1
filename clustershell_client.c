@@ -45,7 +45,7 @@ char *sendCommandToServer(char *ip, int port, char *command, char *input) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if(sock < 0) {
         perror("socket()");
-        return;
+        return NULL;
     }
 
     struct sockaddr_in serverAddr;
@@ -56,22 +56,32 @@ char *sendCommandToServer(char *ip, int port, char *command, char *input) {
     if(connect(sock, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
         perror("connect()");
     }
-    char *buff = (char *)malloc(sizeof(int) + strlen(command) + strlen(input));
-    snprintf(buff , sizeof(int) , "%d" , strlen(command));
-    strcpy(buff + sizeof(int), command);
-    strcpy(buff + sizeof(int) + strlen(command), input); 
-    if(send(sock, buff, sizeof(int) + strlen(command) + strlen(input), 0) < 0) {
-        perror("send()");
-    }
+
+    int cmdlen = strlen(command);
+    send(sock , &cmdlen , sizeof(int) , 0);
+
+    send(sock , command , cmdlen+1 , 0);
+
+    send(sock , input , strlen(input)+1 , 0);
+
+    // char *buff = (char *)malloc(sizeof(int) + strlen(command) + strlen(input));
+    // *buff = strlen(command);
+    // strcpy(buff + sizeof(int), command);
+    // strcpy(buff + sizeof(int) + strlen(command), input); 
+
+    // printf("%s\n" , buff);
+    // if(send(sock, buff, sizeof(int) + strlen(command) + strlen(input), 0) < 0) {
+    //     perror("send()");
+    // }
 
     shutdown(sock , SHUT_WR);
 
-    char *recv_buff = (char *)malloc(sizeof(char) * 5000);
-    char *temp = (char *)malloc(sizeof(char) * 100);
-    while(recv(sock, temp, 100, 0) != 0) {
-        strcat(recv_buff, temp);
-    }
-    free(temp);
+    int oplen;
+    recv(sock , &oplen , sizeof(int) , 0);
+    oplen++;
+
+    char *recv_buff = (char *)malloc(sizeof(char) * oplen);
+    recv(sock , recv_buff , oplen+1 , 0);
     return recv_buff;
 }
 
@@ -85,9 +95,17 @@ char *execCommand(char *command, char *input) {
         return sendCommandToServer(LOCAL_ADDRESS, SERVER_PORT, command, input);
     } else {
         // Extract name
-        char *name = strtok_r(first, '.', &temp);
+        char *name = strtok_r(first, ".", &temp);
         return sendCommandToServer(getIP(name), SERVER_PORT, command, input);
     }
+}
+
+void printhead()
+{
+    fprintf(stdout , "\033[1;34m%s\033[0m$ " , "ClusterShell");
+    fflush(NULL);
+
+    return;
 }
 
 void main(int argc, char *argv[]) {
@@ -100,6 +118,7 @@ void main(int argc, char *argv[]) {
     char input[1000];
     char *prevOut = "";
     while(1) {
+        printhead();
         fgets(input, 1000, stdin);
         int size = strlen(input);
         if(input[size - 1] == '\n')
@@ -109,7 +128,7 @@ void main(int argc, char *argv[]) {
         char *command = strtok(input, "|");
         int commands = 0;
         while(command != NULL) {
-            prevOut = execCommand(command, prevOut);
+            prevOut = execCommand(command, prevOut);;
             commands++;
             command = strtok(NULL, "|");
         }
