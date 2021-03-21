@@ -33,6 +33,7 @@ void readConfig(){
         strcpy(states[no_of_nodes].cwd , cwd);
         no_of_nodes++;
     }
+    fflush(config);
     fclose(config);
 }
 
@@ -48,8 +49,10 @@ char* get_cwd(char* ip){
 
     chdir(base_path);
     FILE* file = fopen("server_config.txt" , "w");
-    for(int i=0; i<no_of_nodes; i++)
+    for(int i=0; i<no_of_nodes; i++){
         fprintf(file , "%s %s\n" , states[i].ip , states[i].cwd);
+        fflush(file);
+    }
     fclose(file);
 
     return states[no_of_nodes-1].cwd;
@@ -67,6 +70,7 @@ void change_state(char* ip , char* state){
     FILE* file = fopen("server_config.txt" , "w");
     for(int i=0; i<no_of_nodes; i++){
         fprintf(file , "%s %s\n" , states[i].ip , states[i].cwd);
+        fflush(file);
     }
     fclose(file);
 }
@@ -112,6 +116,8 @@ int main(){
 
 
         int ipfd[2] , opfd[2];
+        fflush(stdout);
+        fflush(stdin);
         pipe(ipfd);
         pipe(opfd);
 
@@ -154,13 +160,15 @@ int main(){
                 close(ipfd[1]);
 
                 char *recv_buff = (char *)malloc(sizeof(char) * 10000);
+                int oplen=0;
                 while(read(opfd[0] , &buf , 1) > 0){
+                    oplen++;
                     strncat(recv_buff, &buf, 1);
                 }
 
-                int oplen = strlen(recv_buff);
+                int offset = strlen(recv_buff) - oplen;
                 send(connfd , &oplen , sizeof(int) , 0);
-                send(connfd , recv_buff , oplen+1 , 0);
+                send(connfd , recv_buff + offset , oplen+1 , 0);
                 close(opfd[0]);
             }
         }
