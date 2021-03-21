@@ -55,6 +55,7 @@ char *sendCommandToServer(char *ip, int port, char *command, char *input) {
     serverAddr.sin_addr.s_addr = inet_addr(ip);
     if(connect(sock, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
         perror("connect()");
+        return NULL;
     }
 
     int cmdlen = strlen(command);

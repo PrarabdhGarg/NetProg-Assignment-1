@@ -160,15 +160,15 @@ int main(){
                 close(ipfd[1]);
 
                 char *recv_buff = (char *)malloc(sizeof(char) * 10000);
+                memset(recv_buff , 0 , 10000);
                 int oplen=0;
                 while(read(opfd[0] , &buf , 1) > 0){
                     oplen++;
                     strncat(recv_buff, &buf, 1);
                 }
 
-                int offset = strlen(recv_buff) - oplen;
                 send(connfd , &oplen , sizeof(int) , 0);
-                send(connfd , recv_buff + offset , oplen+1 , 0);
+                send(connfd , recv_buff , oplen+1 , 0);
                 close(opfd[0]);
             }
         }
