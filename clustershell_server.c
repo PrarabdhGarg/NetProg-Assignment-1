@@ -6,8 +6,11 @@
 #include<string.h>
 #include<unistd.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
 #define PORT 8000
+
+char base_path[1000];
 
 typedef struct state{
     char ip[30];
@@ -22,11 +25,14 @@ void readConfig(){
     FILE* config = fopen("server_config.txt" , "r");
     no_of_nodes = 0;
 
-    while(!feof(config)){
-        fscanf(config , "%s %s" , states[no_of_nodes].ip , states[no_of_nodes].cwd);
+    char cwd[1000];
+    char ip[30];
+
+    while(fscanf(config , "%s %s" , ip , cwd) > 0){
+        strcpy(states[no_of_nodes].ip , ip);
+        strcpy(states[no_of_nodes].cwd , cwd);
         no_of_nodes++;
     }
-
     fclose(config);
 }
 
@@ -38,35 +44,31 @@ char* get_cwd(char* ip){
 
     strcpy(states[no_of_nodes].ip , ip);
     strcpy(states[no_of_nodes].cwd , getenv("HOME"));
-
     no_of_nodes++;
 
-    // FILE* cfg = fopen("server_config.txt" , "w");
-    // for(int i=0; i<no_of_nodes; i++){
-    //     fprintf(cfg , "%s %s\n" , states[i].ip , states[i].cwd);
-    //     fflush(cfg);
-    // }
-    // fclose(cfg);
+    chdir(base_path);
+    FILE* file = fopen("server_config.txt" , "w");
+    for(int i=0; i<no_of_nodes; i++)
+        fprintf(file , "%s %s\n" , states[i].ip , states[i].cwd);
+    fclose(file);
 
     return states[no_of_nodes-1].cwd;
 }
 
 void change_state(char* ip , char* state){
     for(int i=0; i<no_of_nodes; i++){
-        if(strcmp(ip , states[i].ip)==0)
-            strcpy(states[i].cwd , state);
+        if(strcmp(ip , states[i].ip)==0){
+            chdir(state);
+            getcwd(states[i].cwd , 1000);
+        }
     }
-    strcpy(states[no_of_nodes].ip , ip);
-    strcpy(states[no_of_nodes].cwd , state);
-
-    no_of_nodes++;
-
-    // FILE* config = fopen("server_config.txt" , "w");
-    // for(int i=0; i<no_of_nodes; i++){
-    //     printf("H %s %s\n" , states[i].ip , states[i].cwd);
-    //     fprintf(config , "%s %s\n" , states[i].ip , states[i].cwd);
-    // }
-    //fclose(config);
+    
+    chdir(base_path);
+    FILE* file = fopen("server_config.txt" , "w");
+    for(int i=0; i<no_of_nodes; i++){
+        fprintf(file , "%s %s\n" , states[i].ip , states[i].cwd);
+    }
+    fclose(file);
 }
 
 int main(){
@@ -77,7 +79,8 @@ int main(){
     }
 
     readConfig();
-    chdir(getenv("HOME"));
+    getcwd(base_path , 1000);
+    signal(SIGPIPE , SIG_IGN);
 
     struct sockaddr_in servaddr;
     bzero(&servaddr , sizeof(servaddr));
@@ -114,19 +117,9 @@ int main(){
 
         char *delim = " \t\n";
         char* command = strtok(cmd , delim);
-        printf("command %s\n" , command);
-        if(strcmp(command , "cd") == 0){
-            printf("here\n");
+        if(strcmp(command , "cd") == 0){;
             char* newstate = strtok(NULL , delim);
             change_state(ip , newstate);
-            printf("Here %s\n" , newstate);
-            
-            char b[100];
-            getcwd(b , 100);
-            printf("H %s %s\n" , b , newstate);
-            chdir(newstate);
-            getcwd(b , 100);
-            printf("H %s %s\n" , b , newstate);
         }else{
 
             if(fork() == 0){
@@ -172,5 +165,6 @@ int main(){
             }
         }
         close(connfd);
+        chdir(base_path);
     }
 }
