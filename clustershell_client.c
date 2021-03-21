@@ -98,10 +98,9 @@ char *execCommand(char *command, char *input) {
         // Extract name
         char *name = strtok_r(first, ".", &temp);
 
-        char* delim = ".";
-        char *t = strtok(command , delim);
+        command = strchr(command , '.') + 1;
 
-        return sendCommandToServer(getIP(name), SERVER_PORT, strtok(NULL , delim), input);
+        return sendCommandToServer(getIP(name), SERVER_PORT, command, input);
     }
 }
 
