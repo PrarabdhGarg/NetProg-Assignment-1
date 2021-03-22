@@ -162,6 +162,29 @@ void main(int argc, char *argv[]) {
             input[--size] = '\0';
         if(size == 0)
             continue;
+        if(strcmp(input, "nodes") == 0) {
+            for(int i = 0; i < noOfAdresses; i++) {
+                int sock = socket(AF_INET, SOCK_STREAM, 0);
+                if(sock < 0) {
+                    perror("socket()");
+                    continue;
+                }
+                struct sockaddr_in addr;
+                bzero(&addr, sizeof(addr));
+                addr.sin_port = htons(SERVER_PORT);
+                addr.sin_family = AF_INET;
+                addr.sin_addr.s_addr = inet_addr(addresses[i].ipAddress);
+                int conn;
+                if((conn = connect(sock, (struct sockaddr *)&addr, sizeof(addr))) >= 0) {
+                    printf("Conn = %d\t", conn);
+                    printf("Name: %s \t IP: %s\n", addresses[i].name, addresses[i].ipAddress);
+                    int cmdlen = -1;
+                    send(sock, &cmdlen, sizeof(int), 0);
+                    close(sock);
+                }
+            }
+            continue;
+        }
         char *command = strtok(input, "|");
         int commands = 0;
         while(command != NULL) {

@@ -110,6 +110,8 @@ int main(){
 
         int cmdlen;
         recv(connfd , &cmdlen , sizeof(cmdlen) , 0);
+        if(cmdlen < 0)
+            continue;
 
         char cmd[cmdlen+1];
         recv(connfd , cmd , cmdlen+1 , 0);
