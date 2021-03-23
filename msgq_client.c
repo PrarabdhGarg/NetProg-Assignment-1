@@ -11,6 +11,7 @@
 typedef struct {
     long messageType;    // userid of client
     int action;         // 0 -> Login   1 -> Logout   2 -> List Groups   3 -> Create Group   4 -> Join Group 
+    int dest;
     char message[MAX_MSG_LEN];      //  0 -> username 1 -> username 2 -> empty        3 -> Empty    4 -> Group Id
 } ServerMessage;
 
@@ -44,16 +45,17 @@ int main(int argc, char *argv[]) {
     }
 
     while(1) {
-        printf("Enter 1 to logout, 2 to list groups, 3 to create group, 4 to join group\n");
+        printf("Enter 1 to logout, 2 to list groups, 3 to create group, 4 to join group, 5 to send message, 6 to read new messages\n");
         int choice;
         scanf("%d", &choice);
-        if(choice <= 0 || choice > 4) {
+        if(choice <= 0 || choice > 6) {
             printf("Invalid Choice\n");
             continue;
         }
         ServerMessage message;
         message.action = choice;
         message.messageType = userId;
+        message.dest = 1;
         if(choice == 1) {
             strcpy(message.message, argv[1]);
             if(msgsnd(serverMsgqId, &message, sizeof(message), 0) < 0) {
@@ -90,7 +92,7 @@ int main(int argc, char *argv[]) {
                 continue;
             } 
             printf("Group id of newly created group = %s\n", response.message);
-        } else {
+        } else if(choice == 4) {
             printf("Enter groupid of the group you wish to join\n");
             scanf("%s", message.message);
             if(msgsnd(serverMsgqId, &message, sizeof(message), 0) < 0) {
@@ -98,6 +100,32 @@ int main(int argc, char *argv[]) {
                 continue;
             }
             printf("Joined group sucessfully\n");
+        } else if(choice == 5) {
+            printf("Enter Group id or username to send the message\n");
+            char name[100];
+            scanf("%s", name);
+            if((message.dest = atoi(name)) == 0) {
+                message.dest = hash(name);
+            }
+            printf("Enter message to send\n");
+            scanf("%s", message.message);
+            if(msgsnd(serverMsgqId, &message, sizeof(message), 0) < 0) {
+                perror("Faild to send message");
+                continue;
+            }
+        } else if(choice == 6) {
+            printf("Enter group id or username to read new messages\n");
+            char name[100];
+            scanf("%s", name);
+            int dest;
+            if((dest = atoi(name)) == 0) {
+                dest = hash(name);
+            }
+            printf("New Messages: \n");
+            ServerMessage tempMessage;
+            while(msgrcv(clientMsgqId, &tempMessage, sizeof(tempMessage), dest, IPC_NOWAIT) != 0) {
+                printf("%s\n", tempMessage.message);
+            }
         }
     }
 }
