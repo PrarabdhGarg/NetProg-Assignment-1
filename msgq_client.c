@@ -29,7 +29,6 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     int userId = hash(argv[1]);
-    printf("UserId: %d\n" , userId);
     key_t serverKey = ftok(CLIENT_PATH_PREFIX, 1);
     key_t clientKey = ftok(CLIENT_PATH_PREFIX, userId);
     int serverMsgqId = msgget(serverKey, IPC_CREAT | 0666);
