@@ -50,6 +50,8 @@ int main(int argc , char* argv[]){
         int clientKey = ftok(CLIENT_PATH_PREFIX , request.messageType);
         int clientMsgId = msgget(clientKey, IPC_CREAT | 0666);
 
+        printf("Here %d\n" , request.action);
+
         if(request.action == 0){
             int flag = 0;
             int firstempty = -1;
@@ -61,12 +63,14 @@ int main(int argc , char* argv[]){
                     flag = 1;
             }
             if(flag == 1)
-                break;
+                continue;
             
             state.noUsers++;
             state.activeUsr[firstempty] = request.messageType;
+            printf("Logged in user with id: %ld\n" , request.messageType);
         }
         else if(request.action == 1){
+            printf("HERE\n");
             int flag = 0;
             for(int i=0; i<MAXUSR; i++){
                 if(state.activeUsr[i] == request.messageType){
@@ -74,6 +78,8 @@ int main(int argc , char* argv[]){
                     state.activeUsr[i] = 0;
                 }
             }
+
+            printf("Logged out user with id: %ld\n" , request.messageType);
         }
         else if(request.action == 2){
             MESSAGE response;
@@ -97,6 +103,8 @@ int main(int argc , char* argv[]){
             state.groups[state.noGrps].noMembers = 1;
             state.groups[state.noGrps].members[0] = request.messageType;
 
+            state.noGrps++;
+
             MESSAGE response;
             response.messageType = 1;
             response.action = 3;
@@ -105,7 +113,7 @@ int main(int argc , char* argv[]){
 
             msgsnd(clientMsgId , &response , sizeof(response) , 0);             
         }
-        else if(request.action == 1){
+        else if(request.action == 4){
             int Gid = atoi(request.message);
             if(Gid < 2000 + state.noGrps){
                 int idx = 2000 - Gid;
