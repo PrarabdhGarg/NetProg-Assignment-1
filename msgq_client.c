@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
     while(1) {
         printf("Enter 1 to logout, 2 to list groups, 3 to create group, 4 to join group\n");
         int choice;
-        scanf("%d\n", &choice);
+        scanf("%d", &choice);
         if(choice <= 0 || choice > 4) {
             printf("Invalid Choice\n");
             continue;
@@ -76,6 +76,7 @@ int main(int argc, char *argv[]) {
             char *groupId = strtok(response.message, " ");
             while(groupId != NULL) {
                 printf("%s\n", groupId);
+                groupId = strtok(NULL, " ");
             }
         } else if(choice == 3) {
             if(msgsnd(serverMsgqId, &message, sizeof(message), 0) < 0) {
@@ -91,12 +92,12 @@ int main(int argc, char *argv[]) {
             printf("Group id of newly created group = %s\n", response.message);
         } else {
             printf("Enter groupid of the group you wish to join\n");
-            scanf("%s\n", message.message);
+            scanf("%s", message.message);
             if(msgsnd(serverMsgqId, &message, sizeof(message), 0) < 0) {
                 perror("Failed to Get groups");
                 continue;
             }
-            printf("Joined group sucessfully");
+            printf("Joined group sucessfully\n");
         }
     }
 }

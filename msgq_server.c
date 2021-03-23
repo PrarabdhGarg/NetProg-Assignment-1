@@ -87,7 +87,6 @@ int main(int argc , char* argv[]){
             for(int i=0; i<state.noGrps; i++){
                 size += sprintf(temp+size , "%d " , state.groups[i].gid);
             }
-
             msgsnd(clientMsgId , &response , sizeof(response) , 0);
         }
         else if(request.action == 3){
@@ -96,6 +95,7 @@ int main(int argc , char* argv[]){
             state.groups[state.noGrps].gid = newGid;
             state.groups[state.noGrps].noMembers = 1;
             state.groups[state.noGrps].members[0] = request.messageType;
+            state.noGrps++;
 
             MESSAGE response;
             response.messageType = 1;
