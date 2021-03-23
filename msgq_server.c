@@ -61,10 +61,11 @@ int main(int argc , char* argv[]){
                     flag = 1;
             }
             if(flag == 1)
-                break;
+                continue;
             
             state.noUsers++;
             state.activeUsr[firstempty] = request.messageType;
+            printf("Logged in user with id: %ld\n" , request.messageType);
         }
         else if(request.action == 1){
             int flag = 0;
@@ -74,6 +75,8 @@ int main(int argc , char* argv[]){
                     state.activeUsr[i] = 0;
                 }
             }
+
+            printf("Logged out user with id: %ld\n" , request.messageType);
         }
         else if(request.action == 2){
             MESSAGE response;
@@ -88,6 +91,7 @@ int main(int argc , char* argv[]){
                 size += sprintf(temp+size , "%d " , state.groups[i].gid);
             }
             msgsnd(clientMsgId , &response , sizeof(response) , 0);
+            printf("Group List requested by user with id: %ld\n" , request.messageType);
         }
         else if(request.action == 3){
             int newGid = 2000 + state.noGrps;
@@ -95,6 +99,7 @@ int main(int argc , char* argv[]){
             state.groups[state.noGrps].gid = newGid;
             state.groups[state.noGrps].noMembers = 1;
             state.groups[state.noGrps].members[0] = request.messageType;
+
             state.noGrps++;
 
             MESSAGE response;
@@ -103,14 +108,26 @@ int main(int argc , char* argv[]){
             memset(response.message , 0 , sizeof(response.message));
             sprintf(response.message , "%d" , newGid);  
 
-            msgsnd(clientMsgId , &response , sizeof(response) , 0);             
+            msgsnd(clientMsgId , &response , sizeof(response) , 0);
+            
+            printf("Created Group %d for user with id %ld\n" , newGid , request.messageType);             
         }
-        else if(request.action == 1){
+        else if(request.action == 4){
             int Gid = atoi(request.message);
             if(Gid < 2000 + state.noGrps){
                 int idx = 2000 - Gid;
-                state.groups[idx].members[state.groups[idx].noMembers] = request.messageType;
-                state.groups[idx].noMembers++;
+
+                int flag=0;
+                for(int i=0; i<state.noGrps; i++){
+                    if(state.groups[idx].members[i] == request.messageType)
+                        flag = 1;
+                }
+
+                if(flag == 0){
+                    state.groups[idx].members[state.groups[idx].noMembers] = request.messageType;
+                    state.groups[idx].noMembers++;
+                    printf("Added user with id %ld to group %d\n" , request.messageType , Gid);
+                }
             }
         }
     }
