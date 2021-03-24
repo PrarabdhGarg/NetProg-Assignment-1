@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
             printf("Enter message to send\n");
             scanf("%s", message.message);
             if(msgsnd(serverMsgqId, &message, sizeof(message), 0) < 0) {
-                perror("Faild to send message");
+                perror("Failed to send message");
                 continue;
             }
         } else if(choice == 6) {

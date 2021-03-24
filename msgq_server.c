@@ -132,17 +132,26 @@ int main(int argc , char* argv[]){
             }
         }
         else if(request.action == 5){
-            int destKey = ftok(CLIENT_PATH_PREFIX , request.messageDest);
-            int destMsgId = msgget(destKey, IPC_CREAT | 0666);
-
             if(request.messageDest >= 2000){
-                long temp = request.messageDest;
+                long Gid = request.messageDest;
                 request.messageDest = request.messageType;
-                request.messageType = temp;
-            }
+                request.messageType = Gid;
 
-            msgsnd(destMsgId , &request , sizeof(request) , 0);
-            printf("Sent message from %ld to %ld\n" , request.messageType , request.messageDest);
+                long idx = Gid - 2000;
+                if(idx < state.noGrps){
+                    for(int i=0; i<state.groups[idx].noMembers; i++){
+                        int destKey = ftok(CLIENT_PATH_PREFIX , state.groups[idx].members[i]);
+                        int destMsgId = msgget(destKey, IPC_CREAT | 0666);
+                        msgsnd(destMsgId , &request , sizeof(request) , 0);
+                    }
+                }
+            }else{
+                int destKey = ftok(CLIENT_PATH_PREFIX , request.messageDest);
+                int destMsgId = msgget(destKey, IPC_CREAT | 0666);
+
+                msgsnd(destMsgId , &request , sizeof(request) , 0);
+                printf("Sent message from %ld to %ld: %s\n" , request.messageType , request.messageDest , request.message);
+            }
         }
 
     }
