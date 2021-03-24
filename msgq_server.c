@@ -142,7 +142,7 @@ int main(int argc , char* argv[]){
             }
 
             msgsnd(destMsgId , &request , sizeof(request) , 0);
-            printf("Sent message from %d to %d\n" , request.messageType , request.messageDest);
+            printf("Sent message from %ld to %ld\n" , request.messageType , request.messageDest);
         }
 
     }
