@@ -5,7 +5,7 @@
 #include <sys/msg.h>
 #include <sys/types.h>
 
-#define CLIENT_PATH_PREFIX "/init"
+#define CLIENT_PATH_PREFIX "./init"
 #define MAX_MSG_LEN 1000
 
 typedef struct {
@@ -108,7 +108,10 @@ int main(int argc, char *argv[]) {
                 message.dest = hash(name);
             }
             printf("Enter message to send\n");
-            scanf("%s", message.message);
+            char buff[1000];
+            scanf("%s", buff);
+            
+            sprintf(message.message , "%s: %s" , argv[1] , buff);
             if(msgsnd(serverMsgqId, &message, sizeof(message), 0) < 0) {
                 perror("Failed to send message");
                 continue;
@@ -123,7 +126,7 @@ int main(int argc, char *argv[]) {
             }
             printf("New Messages: \n");
             ServerMessage tempMessage;
-            while(msgrcv(clientMsgqId, &tempMessage, sizeof(tempMessage), dest, IPC_NOWAIT) != 0) {
+            while(msgrcv(clientMsgqId, &tempMessage, sizeof(tempMessage), dest, IPC_NOWAIT) != -1) {
                 printf("%s\n", tempMessage.message);
             }
         }

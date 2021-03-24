@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CLIENT_PATH_PREFIX "/init"
+#define CLIENT_PATH_PREFIX "./init"
 #define MSG_SIZE 1000
 #define MAXUSR 1000
 #define MAXGRP 1000
@@ -150,7 +150,7 @@ int main(int argc , char* argv[]){
                 int destMsgId = msgget(destKey, IPC_CREAT | 0666);
 
                 msgsnd(destMsgId , &request , sizeof(request) , 0);
-                printf("Sent message from %ld to %ld: %s\n" , request.messageType , request.messageDest , request.message);
+                printf("Sent message from %ld to %ld\n" , request.messageType , request.messageDest);
             }
         }
 
