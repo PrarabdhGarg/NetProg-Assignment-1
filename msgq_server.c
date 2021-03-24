@@ -142,6 +142,7 @@ int main(int argc , char* argv[]){
                     for(int i=0; i<state.groups[idx].noMembers; i++){
                         int destKey = ftok(CLIENT_PATH_PREFIX , state.groups[idx].members[i]);
                         int destMsgId = msgget(destKey, IPC_CREAT | 0666);
+                        printf("Sent group message of group %ld to %ld\n" , Gid , state.groups[idx].members[i]);
                         msgsnd(destMsgId , &request , sizeof(request) , 0);
                     }
                 }
