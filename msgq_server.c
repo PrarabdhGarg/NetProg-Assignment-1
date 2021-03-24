@@ -13,6 +13,7 @@
 typedef struct msg{
     long messageType;
     int action;
+    long messageDest;
     char message[MSG_SIZE];
 }MESSAGE;
 
@@ -130,5 +131,19 @@ int main(int argc , char* argv[]){
                 }
             }
         }
+        else if(request.action == 5){
+            int destKey = ftok(CLIENT_PATH_PREFIX , request.messageDest);
+            int destMsgId = msgget(destKey, IPC_CREAT | 0666);
+
+            if(request.messageDest >= 2000){
+                long temp = request.messageDest;
+                request.messageDest = request.messageType;
+                request.messageType = temp;
+            }
+
+            msgsnd(destMsgId , &request , sizeof(request) , 0);
+            printf("Sent message from %d to %d\n" , request.messageType , request.messageDest);
+        }
+
     }
 }

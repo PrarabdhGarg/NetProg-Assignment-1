@@ -11,7 +11,7 @@
 typedef struct {
     long messageType;    // userid of client
     int action;         // 0 -> Login   1 -> Logout   2 -> List Groups   3 -> Create Group   4 -> Join Group 
-    int dest;
+    long dest;
     char message[MAX_MSG_LEN];      //  0 -> username 1 -> username 2 -> empty        3 -> Empty    4 -> Group Id
 } ServerMessage;
 
