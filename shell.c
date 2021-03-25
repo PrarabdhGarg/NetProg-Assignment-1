@@ -15,6 +15,7 @@
 
 char input[1000]= "";
 jmp_buf return_here;
+char *savePtr;
 
 typedef struct node{
     int avail;
@@ -123,11 +124,11 @@ void sh_execute(char *input) {
     PIPE* list = NULL;
     char *args[50];
     char *delim = " \t\n";
-    char *command = strtok(input, delim);
+    char *command = strtok_r(input, delim, &savePtr);
     if(strcmp(command, "sc") == 0) {
-        char *arg = strtok(NULL, delim);
+        char *arg = strtok_r(NULL, delim, &savePtr);
         if(strcmp(arg, "-d") == 0) {
-            int index = atoi(strtok(NULL, delim));
+            int index = atoi(strtok_r(NULL, delim, &savePtr));
             if(removeScCommand(index) == -1) {
                 printf("Error removing shortcut command\n");
                 return;
@@ -135,9 +136,9 @@ void sh_execute(char *input) {
             printf("Shortcut command removed sucessfully\n");
             return;
         } else if(strcmp(arg, "-i") == 0) {
-            char *temp = strtok(NULL, delim);
+            char *temp = strtok_r(NULL, delim, &savePtr);
             int index = atoi(temp);
-            char *comm = strtok(NULL, "\0");
+            char *comm = strtok_r(NULL, "\0", &savePtr);
             if(writeScCommand(index, comm) == -1) {
                 printf("Error while adding Shortcut command\n");
                 return;
@@ -152,10 +153,15 @@ void sh_execute(char *input) {
     char *commandPath;
     args[0] = command;
     int i = 1;
-    char *arg = strtok(NULL, delim);
+    char *arg;
+    if(savePtr != NULL && savePtr[0] == '"') {
+        arg = strtok_r(NULL, "\"", &savePtr);
+    } else {
+        arg = strtok_r(NULL, delim, &savePtr);
+    }
     while(arg != NULL) {
         if(arg[0] == '<') {
-            char *filename = strlen(arg) == 1 ? strtok(NULL, delim) : arg + 1;
+            char *filename = strlen(arg) == 1 ? strtok_r(NULL, delim, &savePtr) : arg + 1;
             int fd = open(filename, O_RDONLY);
             if(fd < 0) {
                 printf("Error. File doesn't exist\n");
@@ -169,7 +175,7 @@ void sh_execute(char *input) {
             }
         } else if(arg[0] == '>') {
             if(strlen(arg) > 1 && arg[1] == '>') {
-                char *filename = strlen(arg) == 2 ? strtok(NULL, delim) : arg + 2;
+                char *filename = strlen(arg) == 2 ? strtok_r(NULL, delim, &savePtr) : arg + 2;
                 int fd = open(filename, O_RDWR | O_APPEND);
                 if(fd < 0) {
                     fd = creat(filename, 0777);
@@ -182,7 +188,7 @@ void sh_execute(char *input) {
                     return;
                 }
             } else {
-                char *filename = strlen(arg) == 1 ? strtok(NULL, delim) : arg + 1;
+                char *filename = strlen(arg) == 1 ? strtok_r(NULL, delim, &savePtr) : arg + 1;
                 int fd = open(filename, O_RDWR | O_TRUNC);
                 if(fd < 0) {
                     fd = creat(filename, 0777);
@@ -350,7 +356,11 @@ void sh_execute(char *input) {
         }else {
             args[i++] = arg;
         }
-        arg = strtok(NULL, delim);
+        if(savePtr != NULL && savePtr[0] == '"') {
+            arg = strtok_r(NULL, "\"", &savePtr);
+        } else {
+            arg = strtok_r(NULL, delim, &savePtr);
+        }
     }
     args[i] = NULL;
     fprintf(op_stream , "Final Step: %s, Process Id: %d\n", args[0] , getpid());
