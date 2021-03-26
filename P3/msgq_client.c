@@ -4,6 +4,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/types.h>
+#include <time.h>
 
 #define CLIENT_PATH_PREFIX "./init"
 #define MAX_MSG_LEN 1000
@@ -13,6 +14,7 @@ typedef struct {
     int action;         // 0 -> Login   1 -> Logout   2 -> List Groups   3 -> Create Group   4 -> Join Group 
     long dest;
     char message[MAX_MSG_LEN];      //  0 -> username 1 -> username 2 -> empty        3 -> Empty    4 -> Group Id
+    time_t timeout;
 } ServerMessage;
 
 int hash(char *username) {
@@ -111,6 +113,14 @@ int main(int argc, char *argv[]) {
             printf("\033[1;32mEnter message to send\n\033[0m");
             char buff[1000];
             fgets(buff , 1000 , stdin);
+
+            if(message.dest >= 2000){
+                printf("\033[1;32mEnter timeout in seconds\n\033[0m");
+                int x;
+                scanf("%d" , &x);
+
+                message.timeout = time(NULL) + x;
+            }
             
             sprintf(message.message , "\033[1;34m%s: \033[0m%s" , argv[1] , buff);
             if(msgsnd(serverMsgqId, &message, sizeof(message), 0) < 0) {

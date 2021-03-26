@@ -4,23 +4,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define CLIENT_PATH_PREFIX "./init"
 #define MSG_SIZE 1000
 #define MAXUSR 1000
 #define MAXGRP 1000
+#define MAXPENDING 100
 
 typedef struct msg{
     long messageType;
     int action;
     long messageDest;
     char message[MSG_SIZE];
+    time_t timeout;
 }MESSAGE;
+
+typedef struct list{
+    MESSAGE msg[MAXPENDING];
+    int tail;
+}LIST;
 
 typedef struct grp{
     int gid;
     int noMembers;
     long members[MAXUSR];
+    LIST pendingMsg;
 }GROUP;
 
 typedef struct state{
@@ -100,6 +109,7 @@ int main(int argc , char* argv[]){
             state.groups[state.noGrps].gid = newGid;
             state.groups[state.noGrps].noMembers = 1;
             state.groups[state.noGrps].members[0] = request.messageType;
+            state.groups[state.noGrps].pendingMsg.tail = 0;
 
             state.noGrps++;
 
@@ -115,8 +125,9 @@ int main(int argc , char* argv[]){
         }
         else if(request.action == 4){
             int Gid = atoi(request.message);
+            time_t currTime = time(NULL);
             if(Gid < 2000 + state.noGrps){
-                int idx = 2000 - Gid;
+                int idx = Gid - 2000;
 
                 int flag=0;
                 for(int i=0; i<state.noGrps; i++){
@@ -127,6 +138,20 @@ int main(int argc , char* argv[]){
                 if(flag == 0){
                     state.groups[idx].members[state.groups[idx].noMembers] = request.messageType;
                     state.groups[idx].noMembers++;
+
+                    for(int j = 0; j<state.groups[idx].pendingMsg.tail; j++){
+                        if(currTime > state.groups[idx].pendingMsg.msg[j].timeout){
+                            for(int k = j+1; k<state.groups[idx].pendingMsg.tail; k++){
+                                state.groups[idx].pendingMsg.msg[k-1] = state.groups[idx].pendingMsg.msg[k];
+                            }
+                            state.groups[idx].pendingMsg.tail--;
+                            j--;
+                        }
+                        else{
+                            msgsnd(clientMsgId , &state.groups[idx].pendingMsg.msg[j] , sizeof(state.groups[idx].pendingMsg.msg[j]) , 0);
+                        }
+                    }
+
                     printf("Added user with id %ld to group %d\n" , request.messageType , Gid);
                 }
             }
@@ -139,6 +164,8 @@ int main(int argc , char* argv[]){
 
                 long idx = Gid - 2000;
                 if(idx < state.noGrps){
+                    state.groups[idx].pendingMsg.msg[state.groups[idx].pendingMsg.tail] = request;
+                    state.groups[idx].pendingMsg.tail++;
                     for(int i=0; i<state.groups[idx].noMembers; i++){
                         int destKey = ftok(CLIENT_PATH_PREFIX , state.groups[idx].members[i]);
                         int destMsgId = msgget(destKey, IPC_CREAT | 0666);
