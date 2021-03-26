@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
             printf("\033[1;32mEnter Group id or username to send the message\n\033[0m");
             char name[100];
             scanf("%s", name);
-            getchar();
+            
             if((message.dest = atoi(name)) == 0) {
                 message.dest = hash(name);
             } else {
@@ -118,15 +118,8 @@ int main(int argc, char *argv[]) {
             }
             printf("\033[1;32mEnter message to send\n\033[0m");
             char buff[1000];
+            getchar();
             fgets(buff , 1000 , stdin);
-
-            if(message.dest >= 2000){
-                printf("\033[1;32mEnter timeout in seconds\n\033[0m");
-                int x;
-                scanf("%d" , &x);
-
-                message.timeout = time(NULL) + x;
-            }
             
             sprintf(message.message , "\033[1;34m%s: \033[0m%s" , argv[1] , buff);
             if(msgsnd(serverMsgqId, &message, sizeof(message), 0) < 0) {
