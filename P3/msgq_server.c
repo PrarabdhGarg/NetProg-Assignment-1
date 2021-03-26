@@ -116,7 +116,7 @@ int main(int argc , char* argv[]){
         else if(request.action == 4){
             int Gid = atoi(request.message);
             if(Gid < 2000 + state.noGrps){
-                int idx = 2000 - Gid;
+                int idx = Gid - 2000;
 
                 int flag=0;
                 for(int i=0; i<state.noGrps; i++){
