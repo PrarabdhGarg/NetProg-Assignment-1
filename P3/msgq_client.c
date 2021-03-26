@@ -58,6 +58,7 @@ int main(int argc, char *argv[]) {
         message.action = choice;
         message.messageType = userId;
         message.dest = 1;
+        message.timeout = 60;
         if(choice == 1) {
             strcpy(message.message, argv[1]);
             if(msgsnd(serverMsgqId, &message, sizeof(message), 0) < 0) {
@@ -109,6 +110,11 @@ int main(int argc, char *argv[]) {
             getchar();
             if((message.dest = atoi(name)) == 0) {
                 message.dest = hash(name);
+            } else {
+                printf("\033[1;32mSet message timeout. Default timeout 60 seconds\n\033[0m");
+                int x;
+                scanf("%d", &x);
+                message.timeout = time(NULL) + x;
             }
             printf("\033[1;32mEnter message to send\n\033[0m");
             char buff[1000];
