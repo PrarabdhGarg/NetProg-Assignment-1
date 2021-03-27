@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 #define SERVER_PORT 8000
 #define LOCAL_ADDRESS "127.0.0.1"
@@ -41,10 +44,10 @@ char *getIP(char *name) {
     return NULL;
 }
 
-char *sendCommandToServer(char *ip, int port, char *command, char *input) {
+char *sendCommandToServer(char *ip, int port, char *command, char *input, char *name) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if(sock < 0) {
-        perror("socket()");
+        perror(name);
         return NULL;
     }
 
@@ -54,7 +57,7 @@ char *sendCommandToServer(char *ip, int port, char *command, char *input) {
     serverAddr.sin_port = htons(port);
     serverAddr.sin_addr.s_addr = inet_addr(ip);
     if(connect(sock, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
-        perror("connect()");
+        perror(name);
         return NULL;
     }
 
@@ -86,13 +89,16 @@ char *sendCommandToServer(char *ip, int port, char *command, char *input) {
     return recv_buff;
 }
 
-char *concatenate(size_t size, char *array[size], const char *joint){
+char *concatenate(size_t size, char *array[size], const char *joint) {
     size_t jlen, lens[size];
     size_t i, total_size = (size-1) * (jlen=strlen(joint)) + 1;
     char *result, *p;
 
 
     for(i=0;i<size;++i){
+        if(array[i] == NULL) {
+            array[i] = "\n";
+        }
         total_size += (lens[i]=strlen(array[i]));
     }
     p = result = malloc(total_size);
@@ -109,23 +115,36 @@ char *concatenate(size_t size, char *array[size], const char *joint){
 }
 
 char *execCommand(char *command, char *input) {
+    if(input == NULL) {
+        input = "";
+    }
     char *tempCommand = (char *) malloc(sizeof(char) * (strlen(command) + 1));
     strcpy(tempCommand, command);
     char *temp;
     char *first = strtok_r(tempCommand, " \t\n\0", &temp);
     if(strchr(first, '.') == NULL) {
         // Send command to local-host
-        return sendCommandToServer(LOCAL_ADDRESS, SERVER_PORT, command, input);
+        return sendCommandToServer(LOCAL_ADDRESS, SERVER_PORT, command, input, "localhost");
     } else if(strchr(first, '*') != NULL) {
         // Send Command to each server
-        char *temp[noOfAdresses];
+        // char *temp[noOfAdresses];
         char *name = strtok_r(first, ".", &temp);
         command = strchr(command , '.') + 1;
         for(int i = 0; i < noOfAdresses; i++) {
-            temp[i] = sendCommandToServer(addresses[i].ipAddress, SERVER_PORT, command, input);
+            int pid = fork();
+            if(pid == 0) {
+                // temp[i] = (char *)malloc(sizeof(char) * 1000);
+                char *t = sendCommandToServer(addresses[i].ipAddress, SERVER_PORT, command, input, addresses[i].name);
+                if(t != NULL) {
+                    printf("Output from %s\n%s\n", addresses[i].name, t);
+                }
+                exit(0);
+            }
         }
-        char *final = concatenate(noOfAdresses, temp, "\n");
-        return final;
+        int wpid, status;
+        while ((wpid = wait(&status)) > 0);
+        // char *final = concatenate(noOfAdresses, temp, "\n");
+        return "";
         
     } else {
         // Extract name
@@ -133,7 +152,7 @@ char *execCommand(char *command, char *input) {
 
         command = strchr(command , '.') + 1;
 
-        return sendCommandToServer(getIP(name), SERVER_PORT, command, input);
+        return sendCommandToServer(getIP(name), SERVER_PORT, command, input, name);
     }
 }
 
@@ -164,25 +183,30 @@ void main(int argc, char *argv[]) {
             continue;
         if(strcmp(input, "nodes") == 0) {
             for(int i = 0; i < noOfAdresses; i++) {
-                int sock = socket(AF_INET, SOCK_STREAM, 0);
-                if(sock < 0) {
-                    perror("socket()");
-                    continue;
-                }
-                struct sockaddr_in addr;
-                bzero(&addr, sizeof(addr));
-                addr.sin_port = htons(SERVER_PORT);
-                addr.sin_family = AF_INET;
-                addr.sin_addr.s_addr = inet_addr(addresses[i].ipAddress);
-                int conn;
-                if((conn = connect(sock, (struct sockaddr *)&addr, sizeof(addr))) >= 0) {
-                    printf("Conn = %d\t", conn);
-                    printf("Name: %s \t IP: %s\n", addresses[i].name, addresses[i].ipAddress);
-                    int cmdlen = -1;
-                    send(sock, &cmdlen, sizeof(int), 0);
-                    close(sock);
+                int pid = fork();
+                if(pid == 0) {
+                    int sock = socket(AF_INET, SOCK_STREAM, 0);
+                    if(sock < 0) {
+                        perror("socket()");
+                        continue;
+                    }
+                    struct sockaddr_in addr;
+                    bzero(&addr, sizeof(addr));
+                    addr.sin_port = htons(SERVER_PORT);
+                    addr.sin_family = AF_INET;
+                    addr.sin_addr.s_addr = inet_addr(addresses[i].ipAddress);
+                    int conn;
+                    if((conn = connect(sock, (struct sockaddr *)&addr, sizeof(addr))) >= 0) {
+                        printf("Name: %s \t IP: %s\n", addresses[i].name, addresses[i].ipAddress);
+                        int cmdlen = -1;
+                        send(sock, &cmdlen, sizeof(int), 0);
+                        close(sock);
+                    }
+                    exit(0);
                 }
             }
+            int wpid, status;
+            while ((wpid = wait(&status)) > 0);
             continue;
         }
         char *command = strtok(input, "|");
