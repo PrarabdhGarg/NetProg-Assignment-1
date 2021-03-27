@@ -120,8 +120,6 @@ int main(){
         int ipfd[2] , opfd[2];
         fflush(stdout);
         fflush(stdin);
-        pipe(ipfd);
-        pipe(opfd);
 
         char *delim = " \t\n";
         char* command = strtok(cmd , delim);
@@ -129,49 +127,55 @@ int main(){
             char* newstate = strtok(NULL , delim);
             change_state(ip , newstate);
         }else{
-
             if(fork() == 0){
+                pipe(ipfd);
+                pipe(opfd);
+                if(fork() == 0){
 
-                close(opfd[0]);
-                dup2(opfd[1] , 1);
+                    close(opfd[0]);
+                    dup2(opfd[1] , 1);
 
-                close(ipfd[1]);
-                dup2(ipfd[0] , 0);
+                    close(ipfd[1]);
+                    dup2(ipfd[0] , 0);
 
-                char* args[100];
-                char* arg = command;
+                    char* args[100];
+                    char* arg = command;
 
-                int i=0;
-                while(arg != NULL){
-                    args[i++] = arg;
-                    arg = strtok(NULL , delim);
+                    int i=0;
+                    while(arg != NULL){
+                        args[i++] = arg;
+                        arg = strtok(NULL , delim);
+                    }
+
+                    args[i] = NULL;
+                    execvp(args[0] , args);
+                    printf("Exec call failed");
+                    exit(0);
+                }else{
+                    close(opfd[1]);
+                    close(ipfd[0]);
+
+                    char buf;
+                    while(recv(connfd , &buf , 1 , 0) > 0){
+                        write(ipfd[1] , &buf , 1);
+                    }
+
+                    close(ipfd[1]);
+
+                    char *recv_buff = (char *)malloc(sizeof(char) * 10000);
+                    memset(recv_buff , 0 , 10000);
+                    int oplen=0;
+                    while(read(opfd[0] , &buf , 1) > 0){
+                        oplen++;
+                        strncat(recv_buff, &buf, 1);
+                    }
+
+                    send(connfd , &oplen , sizeof(int) , 0);
+                    send(connfd , recv_buff , oplen+1 , 0);
+                    close(opfd[0]);
+                    close(connfd);
+                    exit(0);
                 }
-
-                args[i] = NULL;
-                execvp(args[0] , args);
-                printf("Exec call failed");
-                exit(0);
-            }else{
-                close(opfd[1]);
-                close(ipfd[0]);
-
-                char buf;
-                while(recv(connfd , &buf , 1 , 0) > 0){
-                    write(ipfd[1] , &buf , 1);
-                }
-                close(ipfd[1]);
-
-                char *recv_buff = (char *)malloc(sizeof(char) * 10000);
-                memset(recv_buff , 0 , 10000);
-                int oplen=0;
-                while(read(opfd[0] , &buf , 1) > 0){
-                    oplen++;
-                    strncat(recv_buff, &buf, 1);
-                }
-
-                send(connfd , &oplen , sizeof(int) , 0);
-                send(connfd , recv_buff , oplen+1 , 0);
-                close(opfd[0]);
             }
         }
         close(connfd);
